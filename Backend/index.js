@@ -14,9 +14,10 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true,
+    origin: [
+      "http://localhost:5173",
+      "https://your-frontend-name.onrender.com", // <-- Replace with your actual frontend URL
+    ],
   })
 );
 
