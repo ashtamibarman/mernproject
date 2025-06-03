@@ -5,84 +5,77 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const mongoDBStore = require("connect-mongodb-session")(session);
 const dotenv = require("dotenv");
-const path = require("path");
 
 dotenv.config();
+
 const app = express();
 
-// MongoDB connection string
 const DB_CONNECTION = process.env.DB_CONNECTION;
 
-// Session store
 const store = new mongoDBStore({
   uri: DB_CONNECTION,
   collection: "sessions",
 });
 
-// CORS setup BEFORE any routes
 app.use(
   cors({
-    origin: "http://localhost:5173", // your frontend origin
+    origin: ["http://localhost:5173", "https://frontend-vzpf.onrender.com"],
     methods: ["GET", "POST", "PUT", "DELETE"],
-    credentials: true, // allow cookies/session
+    credentials: true,
   })
 );
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+app.set("trust proxy", 1); // Important when using HTTPS behind proxy (like Render.com)
 
 app.use(
   session({
     secret: "your-secret-key",
     resave: false,
     saveUninitialized: false,
-
+    store: store,
     cookie: {
       httpOnly: true,
-      secure: true, // because you're on HTTPS (Render)
-      sameSite: "none", // required for cross-origin cookies
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
+      secure: true, // true for HTTPS
+      sameSite: "none", // important for cross-origin cookies
+      maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
 
-// Set EJS engine (optional)
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
-
-// Custom middleware to track login
-app.use((req, res, next) => {
-  req.isLoggedIn = req.session.isLoggedIn;
-  next();
-});
-
-app.use((req, res, next) => {
-  console.log(`➡️  ${req.method} ${req.url}`);
-  console.log("📦 Body:", req.body);
-  next();
-});
-
-// Auth & expense routes
-const expenseRoute = require("./routes/expense");
-const authRouters = require("./routes/authRouter");
-
-app.get("/expenses", (req, res) => {
-  console.log("🔍 SESSION:", req.session);
-  if (!req.session?.isLoggedIn) {
-    console.log("❌ Unauthorized: No session");
+// Define the auth middleware here
+const isAuth = (req, res, next) => {
+  if (req.session?.isLoggedIn) {
+    return next();
+  } else {
     return res.status(401).json({ message: "Unauthorized" });
   }
+};
+
+// Dummy routes for demonstration
+// Replace with your real route files
+app.get("/expenses", isAuth, (req, res) => {
+  res.json({ expenses: [{ label: "Coffee", value: 3, date: "2025-06-01" }] });
 });
 
-app.use("/expenses", expenseRoute);
-app.use(authRouters);
+app.post("/login", (req, res) => {
+  // You should verify username and password here
+  // For demo, let's just accept anything and mark session loggedIn
+  req.session.isLoggedIn = true;
+  req.session.save(() => {
+    res.json({ message: "Logged in successfully" });
+  });
+});
 
-// Serve static files
-app.use(express.static(path.join(__dirname, "public")));
+app.post("/logout", (req, res) => {
+  req.session.destroy(() => {
+    res.json({ message: "Logged out" });
+  });
+});
 
-// MongoDB connection
 mongoose
   .connect(DB_CONNECTION)
   .then(() => {

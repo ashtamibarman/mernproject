@@ -1,27 +1,30 @@
+// App.jsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { FaTrash, FaEdit, FaPlus, FaChartPie, FaTimes } from "react-icons/fa";
 import { PieChart } from "@mui/x-charts/PieChart";
-import { publicRequest } from "./requestMethod";
 import axios from "axios";
 
+const BACKEND_URL = "https://backend-project-mpxb.onrender.com";
+
 function App() {
-  const navigate = useNavigate();
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showReport, setShowReport] = useState(false);
   const [expenses, setExpenses] = useState([]);
   const [label, setLabel] = useState("");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState("");
   const [date, setDate] = useState("");
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authMode, setAuthMode] = useState("login"); // "login" or "signup"
   const [form, setForm] = useState({ username: "", password: "" });
-  const [showSignup, setShowSignup] = useState(false);
 
   const fetchExpenses = async () => {
     try {
-      const res = await publicRequest.get("/expenses");
+      const res = await axios.get(
+        "https://backend-project-mpxb.onrender.com/expenses",
+        { withCredentials: true }
+      );
       setExpenses(res.data.expenses || []);
     } catch (err) {
       console.error("Error fetching expenses:", err);
@@ -30,11 +33,14 @@ function App() {
 
   useEffect(() => {
     axios
-      .get("https://backend-project-mpxb.onrender.com/isLoggedIn", {
-        withCredentials: true,
+      .get(`${BACKEND_URL}/isLoggedIn`, { withCredentials: true })
+      .then((res) => {
+        if (res.data.loggedIn) {
+          setIsLoggedIn(true);
+          fetchExpenses();
+        }
       })
-      .then((res) => setIsLoggedIn(res.data.loggedIn))
-      .catch((err) => console.error(err));
+      .catch(console.error);
   }, []);
 
   const handleLogin = async (e) => {
@@ -49,7 +55,9 @@ function App() {
         },
         { withCredentials: true }
       );
+
       console.log("Login successful", res.data);
+      console.log("Cookies after login:", document.cookie); // Add this
       setIsLoggedIn(true);
       fetchExpenses();
     } catch (err) {
@@ -60,81 +68,66 @@ function App() {
   const handleSignup = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post(
-        "https://backend-project-mpxb.onrender.com/signup",
-        {
-          username: form.username,
-          password: form.password,
-        },
-        { withCredentials: true }
-      );
-      console.log("Signup successful", res.data);
+      await axios.post(`${BACKEND_URL}/signup`, form, {
+        withCredentials: true,
+      });
       setIsLoggedIn(true);
       fetchExpenses();
     } catch (err) {
-      console.error("Signup failed", err);
+      alert("Signup failed");
     }
   };
 
   const handleLogout = async () => {
-    try {
-      await axios.post(
-        "https://backend-project-mpxb.onrender.com/logout",
-        {},
-        { withCredentials: true }
-      );
-      setIsLoggedIn(false);
-      navigate("/");
-    } catch (error) {
-      console.error("Logout failed", error);
-    }
+    await axios.post(`${BACKEND_URL}/logout`, {}, { withCredentials: true });
+    setIsLoggedIn(false);
+    setExpenses([]);
   };
 
   const handleSave = async () => {
+    const data = { label, value: amount, date };
     try {
       if (editId) {
-        await publicRequest.put(`/expenses/${editId}`, {
-          label,
-          value: amount,
-          date,
+        await axios.put(`${BACKEND_URL}/expenses/${editId}`, data, {
+          withCredentials: true,
         });
       } else {
-        await publicRequest.post("/expenses", {
-          label,
-          value: amount,
-          date,
+        await axios.post(`${BACKEND_URL}/expenses`, data, {
+          withCredentials: true,
         });
       }
       resetForm();
       fetchExpenses();
     } catch (err) {
-      console.error("Failed to save:", err);
+      alert("Error saving expense");
     }
   };
 
   const handleDelete = async (id) => {
     try {
-      await publicRequest.delete(`/expenses/${id}`);
+      await axios.delete(`${BACKEND_URL}/expenses/${id}`, {
+        withCredentials: true,
+      });
       fetchExpenses();
     } catch (err) {
-      console.error("Failed to delete:", err);
+      alert("Error deleting");
     }
   };
 
-  const handleEdit = (expense) => {
-    setEditId(expense._id);
-    setLabel(expense.label);
-    setAmount(expense.value);
-    setDate(expense.date);
-    setShowAddForm(true);
+  const handleEdit = (e) => {
+    setLabel(e.label);
+    setAmount(e.value);
+    setDate(e.date);
+    setEditId(e._id);
+    setShowForm(true);
   };
 
   const resetForm = () => {
-    setEditId(null);
     setLabel("");
-    setAmount(0);
+    setAmount("");
     setDate("");
-    setShowAddForm(false);
+    setEditId(null);
+    setShowForm(false);
   };
 
   const filtered = expenses.filter((e) =>
@@ -145,11 +138,11 @@ function App() {
     return (
       <div className="min-h-screen bg-zinc-900 flex items-center justify-center text-white">
         <form
-          onSubmit={showSignup ? handleSignup : handleLogin}
+          onSubmit={authMode === "signup" ? handleSignup : handleLogin}
           className="bg-zinc-800 p-6 rounded-lg w-full max-w-sm"
         >
-          <h2 className="text-2xl font-bold mb-4 text-center text-teal-300">
-            {showSignup ? "Sign Up" : "Login"}
+          <h2 className="text-2xl mb-4 text-center text-teal-300">
+            {authMode === "signup" ? "Sign Up" : "Login"}
           </h2>
           <input
             className="w-full p-2 mb-3 bg-zinc-700 rounded"
@@ -159,24 +152,25 @@ function App() {
           />
           <input
             className="w-full p-2 mb-3 bg-zinc-700 rounded"
-            placeholder="Password"
             type="password"
+            placeholder="Password"
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
-          <button
-            type="submit"
-            className="bg-blue-500 w-full py-2 rounded hover:bg-blue-600"
-          >
-            {showSignup ? "Sign Up" : "Login"}
+          <button className="bg-blue-500 w-full py-2 rounded hover:bg-blue-600">
+            {authMode === "signup" ? "Sign Up" : "Login"}
           </button>
           <p className="text-sm mt-4 text-center">
-            {showSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+            {authMode === "signup"
+              ? "Already have an account?"
+              : "Don't have an account?"}{" "}
             <span
+              onClick={() =>
+                setAuthMode(authMode === "signup" ? "login" : "signup")
+              }
               className="text-teal-400 underline cursor-pointer"
-              onClick={() => setShowSignup(!showSignup)}
             >
-              {showSignup ? "Login" : "Sign Up"}
+              {authMode === "signup" ? "Login" : "Sign Up"}
             </span>
           </p>
         </form>
@@ -185,39 +179,67 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white p-6 relative">
+    <div className="min-h-screen bg-zinc-900 text-white p-6">
       <button
         onClick={handleLogout}
-        className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
+        className="absolute top-4 right-4 bg-red-600 px-4 py-2 rounded hover:bg-red-700"
       >
         Logout
       </button>
 
-      <header className="flex flex-col items-center justify-center mb-10">
-        <h1 className="text-4xl font-bold text-teal-400 mb-4 animate-pulse">
-          Track Your Spending
-        </h1>
-        <div className="flex gap-3">
+      <h1 className="text-4xl text-center text-teal-400 mb-6 font-bold">
+        Expense Tracker
+      </h1>
+
+      <div className="flex justify-center gap-4 mb-6">
+        <button
+          className="bg-green-600 px-4 py-2 rounded"
+          onClick={() => setShowForm(!showForm)}
+        >
+          <FaPlus className="inline mr-2" />
+          {editId ? "Edit" : "Add"} Expense
+        </button>
+        <button
+          className="bg-purple-600 px-4 py-2 rounded"
+          onClick={() => setShowReport(!showReport)}
+        >
+          <FaChartPie className="inline mr-2" />
+          Report
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-zinc-800 p-4 mb-6 rounded">
+          <input
+            className="w-full p-2 mb-3 bg-zinc-700 rounded"
+            placeholder="Label"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+          />
+          <input
+            className="w-full p-2 mb-3 bg-zinc-700 rounded"
+            type="number"
+            placeholder="Amount"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+          />
+          <input
+            className="w-full p-2 mb-3 bg-zinc-700 rounded"
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+          />
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg"
+            className="bg-blue-500 w-full py-2 rounded"
+            onClick={handleSave}
           >
-            <FaPlus className="inline mr-2" /> {editId ? "Edit" : "Add"} Expense
-          </button>
-          <button
-            onClick={() => setShowReport(!showReport)}
-            className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg"
-          >
-            <FaChartPie className="inline mr-2" /> View Report
+            {editId ? "Update" : "Submit"}
           </button>
         </div>
-      </header>
+      )}
 
       {showReport && (
-        <div className="bg-zinc-800 p-6 rounded-lg w-full lg:w-1/3 mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-center text-indigo-300">
-            Expense Breakdown
-          </h2>
+        <div className="mb-6">
           <PieChart
             series={[
               {
@@ -225,93 +247,47 @@ function App() {
                   id: i,
                   value: e.value,
                   label: e.label,
-                  color: `hsl(${i * 40}, 70%, 60%)`,
+                  color: `hsl(${i * 30}, 70%, 60%)`,
                 })),
-                innerRadius: 40,
+                innerRadius: 30,
                 outerRadius: 100,
               },
             ]}
-            width={300}
+            width={400}
             height={250}
-            sx={{ backgroundColor: "#18181b", borderRadius: 8 }}
           />
         </div>
       )}
 
-      <div className="flex flex-col lg:flex-row gap-10">
-        {showAddForm && (
-          <div className="bg-zinc-800 p-6 rounded-lg w-full lg:w-1/3">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-semibold">
-                {editId ? "Edit" : "Add"} Expense
-              </h2>
-              <FaTimes
-                className="cursor-pointer text-red-400"
-                onClick={resetForm}
+      <input
+        className="w-full p-2 mb-4 bg-zinc-700 rounded"
+        placeholder="Search by label"
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      <div className="space-y-4">
+        {filtered.map((item) => (
+          <div
+            key={item._id}
+            className="bg-zinc-800 p-4 flex justify-between items-center rounded"
+          >
+            <div>
+              <h3 className="text-xl font-bold">{item.label}</h3>
+              <p className="text-sm text-gray-400">{item.date}</p>
+            </div>
+            <div className="font-bold text-green-400">${item.value}</div>
+            <div className="flex gap-2">
+              <FaEdit
+                className="text-yellow-400 cursor-pointer"
+                onClick={() => handleEdit(item)}
+              />
+              <FaTrash
+                className="text-red-500 cursor-pointer"
+                onClick={() => handleDelete(item._id)}
               />
             </div>
-            <input
-              className="w-full p-2 mb-3 bg-zinc-700 rounded"
-              placeholder="Label"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-            <input
-              className="w-full p-2 mb-3 bg-zinc-700 rounded"
-              type="number"
-              placeholder="Amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <input
-              className="w-full p-2 mb-3 bg-zinc-700 rounded"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-            <button
-              className="bg-blue-500 w-full py-2 rounded hover:bg-blue-600"
-              onClick={handleSave}
-            >
-              {editId ? "Update" : "Submit"}
-            </button>
           </div>
-        )}
-
-        <div className="flex-1 space-y-4">
-          <input
-            type="text"
-            placeholder="Search expenses..."
-            className="p-2 w-full mb-4 bg-zinc-700 rounded"
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {filtered.map((item) => (
-            <div
-              key={item._id}
-              className="bg-zinc-800 p-4 rounded-lg flex justify-between items-center"
-            >
-              <div>
-                <h3 className="text-xl font-bold text-teal-300">
-                  {item.label}
-                </h3>
-                <p className="text-sm text-zinc-400">{item.date}</p>
-              </div>
-              <div className="text-green-400 font-bold text-lg">
-                ${item.value}
-              </div>
-              <div className="flex gap-3">
-                <FaEdit
-                  className="text-yellow-400 cursor-pointer hover:scale-110"
-                  onClick={() => handleEdit(item)}
-                />
-                <FaTrash
-                  className="text-red-500 cursor-pointer hover:scale-110"
-                  onClick={() => handleDelete(item._id)}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );
