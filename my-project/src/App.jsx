@@ -1,234 +1,308 @@
 import { useEffect, useState } from "react";
-import { FaTrash, FaEdit, FaWindowClose } from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
+import { FaTrash, FaEdit, FaPlus, FaChartPie, FaTimes } from "react-icons/fa";
 import { PieChart } from "@mui/x-charts/PieChart";
 import { publicRequest } from "./requestMethod";
+import axios from "axios";
 
 function App() {
-  const [showAddExpense, setShowAddExpense] = useState(false);
+  const navigate = useNavigate();
+  const [showAddForm, setShowAddForm] = useState(false);
   const [showReport, setShowReport] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
+  const [expenses, setExpenses] = useState([]);
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState(0);
   const [date, setDate] = useState("");
-  const [expenses, setExpenses] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [updatedId, setUpdatedId] = useState("");
-  const [updatedLabel, setUpdatedLabel] = useState("");
-  const [updatedAmount, setUpdatedAmount] = useState("");
-  const [updatedDate, setUpdatedDate] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [search, setSearch] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [form, setForm] = useState({ username: "", password: "" });
+  const [showSignup, setShowSignup] = useState(false);
 
-  const handleAddExpense = () => setShowAddExpense(!showAddExpense);
-  const handleShowReport = () => setShowReport(!showReport);
-  const handleShowEdit = (id) => {
-    setShowEdit(true);
-    setUpdatedId(id);
-  };
-
-  const handleExpense = async () => {
+  const fetchExpenses = async () => {
     try {
-      await publicRequest.post("/expenses", {
-        label,
-        date,
-        value: amount,
-      });
-      window.location.reload();
-    } catch (error) {
-      console.log(error);
+      const res = await publicRequest.get("/expenses");
+      setExpenses(res.data.expenses || []);
+    } catch (err) {
+      console.error("Error fetching expenses:", err);
     }
   };
 
-  const handleUpdateExpense = async () => {
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/isLoggedIn", { withCredentials: true })
+      .then((res) => setIsLoggedIn(res.data.loggedIn))
+      .catch((err) => console.error(err));
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
     try {
-      await publicRequest.put(`/expenses/${updatedId}`, {
-        label: updatedLabel,
-        value: updatedAmount,
-        date: updatedDate,
-      });
-      window.location.reload();
+      const res = await axios.post(
+        "http://localhost:5000/login",
+        {
+          username: form.username,
+          password: form.password,
+        },
+        { withCredentials: true }
+      );
+      console.log("Login successful", res.data);
+      setIsLoggedIn(true);
+      fetchExpenses();
+    } catch (err) {
+      console.error("Login failed", err);
+    }
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await axios.post(
+        "http://localhost:5000/signup",
+        {
+          username: form.username,
+          password: form.password,
+        },
+        { withCredentials: true }
+      );
+      console.log("Signup successful", res.data);
+      setIsLoggedIn(true);
+      fetchExpenses();
+    } catch (err) {
+      console.error("Signup failed", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await axios.post(
+        "http://localhost:5000/logout",
+        {},
+        { withCredentials: true }
+      );
+      setIsLoggedIn(false);
+      navigate("/");
     } catch (error) {
-      console.log(error);
+      console.error("Logout failed", error);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      if (editId) {
+        await publicRequest.put(`/expenses/${editId}`, {
+          label,
+          value: amount,
+          date,
+        });
+      } else {
+        await publicRequest.post("/expenses", {
+          label,
+          value: amount,
+          date,
+        });
+      }
+      resetForm();
+      fetchExpenses();
+    } catch (err) {
+      console.error("Failed to save:", err);
     }
   };
 
   const handleDelete = async (id) => {
     try {
       await publicRequest.delete(`/expenses/${id}`);
-      window.location.reload();
-    } catch (error) {
-      console.log(error);
+      fetchExpenses();
+    } catch (err) {
+      console.error("Failed to delete:", err);
     }
   };
 
-  useEffect(() => {
-    const fetchExpenses = async () => {
-      try {
-        const res = await publicRequest.get("/expenses");
-        const data = res.data.expenses || [];
-        setExpenses(data);
-      } catch (error) {
-        console.error("Error fetching expenses:", error.message);
-      }
-    };
-    fetchExpenses();
-  }, []);
+  const handleEdit = (expense) => {
+    setEditId(expense._id);
+    setLabel(expense.label);
+    setAmount(expense.value);
+    setDate(expense.date);
+    setShowAddForm(true);
+  };
 
-  const filteredExpenses = expenses.filter((item) =>
-    item.label.toLowerCase().includes(searchTerm.toLowerCase())
+  const resetForm = () => {
+    setEditId(null);
+    setLabel("");
+    setAmount(0);
+    setDate("");
+    setShowAddForm(false);
+  };
+
+  const filtered = expenses.filter((e) =>
+    e.label.toLowerCase().includes(search.toLowerCase())
   );
 
-  return (
-    <div className="bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 text-gray-100 min-h-screen py-10 px-4 transition-all duration-300">
-      <div className="max-w-5xl mx-auto">
-        <h1 className="text-4xl font-extrabold text-center mb-8 text-cyan-400 animate-pulse">
-          💸 Expense Tracker
-        </h1>
-
-        {/* Top Controls */}
-        <div className="flex justify-between items-center mb-6 flex-wrap gap-4">
-          <div className="flex gap-4">
-            <button
-              onClick={handleAddExpense}
-              className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-md transition-all duration-300 shadow-lg"
-            >
-              ➕ Add Expense
-            </button>
-            <button
-              onClick={handleShowReport}
-              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-md transition-all duration-300 shadow-lg"
-            >
-              📊 Expense Report
-            </button>
-          </div>
+  if (!isLoggedIn) {
+    return (
+      <div className="min-h-screen bg-zinc-900 flex items-center justify-center text-white">
+        <form
+          onSubmit={showSignup ? handleSignup : handleLogin}
+          className="bg-zinc-800 p-6 rounded-lg w-full max-w-sm"
+        >
+          <h2 className="text-2xl font-bold mb-4 text-center text-teal-300">
+            {showSignup ? "Sign Up" : "Login"}
+          </h2>
           <input
-            type="text"
-            placeholder="Search..."
-            className="p-2 w-48 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none"
-            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full p-2 mb-3 bg-zinc-700 rounded"
+            placeholder="Username"
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+          />
+          <input
+            className="w-full p-2 mb-3 bg-zinc-700 rounded"
+            placeholder="Password"
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+          />
+          <button
+            type="submit"
+            className="bg-blue-500 w-full py-2 rounded hover:bg-blue-600"
+          >
+            {showSignup ? "Sign Up" : "Login"}
+          </button>
+          <p className="text-sm mt-4 text-center">
+            {showSignup ? "Already have an account?" : "Don't have an account?"}{" "}
+            <span
+              className="text-teal-400 underline cursor-pointer"
+              onClick={() => setShowSignup(!showSignup)}
+            >
+              {showSignup ? "Login" : "Sign Up"}
+            </span>
+          </p>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-900 text-white p-6 relative">
+      <button
+        onClick={handleLogout}
+        className="absolute top-4 right-4 bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg"
+      >
+        Logout
+      </button>
+
+      <header className="flex flex-col items-center justify-center mb-10">
+        <h1 className="text-4xl font-bold text-teal-400 mb-4 animate-pulse">
+          Track Your Spending
+        </h1>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowAddForm(!showAddForm)}
+            className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg"
+          >
+            <FaPlus className="inline mr-2" /> {editId ? "Edit" : "Add"} Expense
+          </button>
+          <button
+            onClick={() => setShowReport(!showReport)}
+            className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg"
+          >
+            <FaChartPie className="inline mr-2" /> View Report
+          </button>
+        </div>
+      </header>
+
+      {showReport && (
+        <div className="bg-zinc-800 p-6 rounded-lg w-full lg:w-1/3 mb-8">
+          <h2 className="text-xl font-semibold mb-4 text-center text-indigo-300">
+            Expense Breakdown
+          </h2>
+          <PieChart
+            series={[
+              {
+                data: filtered.map((e, i) => ({
+                  id: i,
+                  value: e.value,
+                  label: e.label,
+                  color: `hsl(${i * 40}, 70%, 60%)`,
+                })),
+                innerRadius: 40,
+                outerRadius: 100,
+              },
+            ]}
+            width={300}
+            height={250}
+            sx={{ backgroundColor: "#18181b", borderRadius: 8 }}
           />
         </div>
+      )}
 
-        {/* Add Expense Form */}
-        {showAddExpense && (
-          <div className="bg-gray-800 p-6 rounded-md mb-6 relative shadow-xl animate-fade-in">
-            <FaWindowClose
-              className="absolute top-4 right-4 cursor-pointer text-xl text-red-400"
-              onClick={handleAddExpense}
-            />
-            <h2 className="text-2xl font-bold mb-4 text-pink-300">
-              ➕ New Expense
-            </h2>
+      <div className="flex flex-col lg:flex-row gap-10">
+        {showAddForm && (
+          <div className="bg-zinc-800 p-6 rounded-lg w-full lg:w-1/3">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-semibold">
+                {editId ? "Edit" : "Add"} Expense
+              </h2>
+              <FaTimes
+                className="cursor-pointer text-red-400"
+                onClick={resetForm}
+              />
+            </div>
             <input
-              type="text"
-              placeholder="Expense name"
-              className="w-full p-2 mb-2 rounded-md bg-gray-700 text-white"
+              className="w-full p-2 mb-3 bg-zinc-700 rounded"
+              placeholder="Label"
+              value={label}
               onChange={(e) => setLabel(e.target.value)}
             />
             <input
-              type="date"
-              className="w-full p-2 mb-2 rounded-md bg-gray-700 text-white"
-              onChange={(e) => setDate(e.target.value)}
-            />
-            <input
+              className="w-full p-2 mb-3 bg-zinc-700 rounded"
               type="number"
               placeholder="Amount"
-              className="w-full p-2 mb-4 rounded-md bg-gray-700 text-white"
+              value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <button
-              onClick={handleExpense}
-              className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-md"
-            >
-              ✅ Submit
-            </button>
-          </div>
-        )}
-
-        {/* Edit Expense Form */}
-        {showEdit && (
-          <div className="bg-gray-800 p-6 rounded-md mb-6 relative shadow-xl animate-fade-in">
-            <FaWindowClose
-              className="absolute top-4 right-4 cursor-pointer text-xl text-red-400"
-              onClick={() => setShowEdit(false)}
-            />
-            <h2 className="text-2xl font-bold mb-4 text-yellow-300">
-              ✏️ Edit Expense
-            </h2>
             <input
-              type="text"
-              placeholder="Expense name"
-              className="w-full p-2 mb-2 rounded-md bg-gray-700 text-white"
-              onChange={(e) => setUpdatedLabel(e.target.value)}
-            />
-            <input
+              className="w-full p-2 mb-3 bg-zinc-700 rounded"
               type="date"
-              className="w-full p-2 mb-2 rounded-md bg-gray-700 text-white"
-              onChange={(e) => setUpdatedDate(e.target.value)}
-            />
-            <input
-              type="number"
-              placeholder="Amount"
-              className="w-full p-2 mb-4 rounded-md bg-gray-700 text-white"
-              onChange={(e) => setUpdatedAmount(e.target.value)}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
             />
             <button
-              onClick={handleUpdateExpense}
-              className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded-md"
+              className="bg-blue-500 w-full py-2 rounded hover:bg-blue-600"
+              onClick={handleSave}
             >
-              💾 Update
+              {editId ? "Update" : "Submit"}
             </button>
           </div>
         )}
 
-        {/* Pie Chart Report */}
-        {showReport && (
-          <div className="bg-gray-800 p-6 rounded-md mb-6 shadow-lg relative animate-fade-in">
-            <FaWindowClose
-              className="absolute top-4 right-4 cursor-pointer text-xl text-red-400"
-              onClick={handleShowReport}
-            />
-            <PieChart
-              series={[
-                {
-                  data: filteredExpenses.map((item, index) => ({
-                    id: index,
-                    value: item.value,
-                    label: item.label,
-                    color: `hsl(${index * 45}, 70%, 60%)`,
-                  })),
-                  innerRadius: 40,
-                  outerRadius: 100,
-                },
-              ]}
-              width={400}
-              height={300}
-              sx={{ backgroundColor: "#1f2937", borderRadius: 8 }}
-            />
-          </div>
-        )}
-
-        {/* Expenses List */}
-        <div className="space-y-4">
-          {filteredExpenses.map((item) => (
+        <div className="flex-1 space-y-4">
+          <input
+            type="text"
+            placeholder="Search expenses..."
+            className="p-2 w-full mb-4 bg-zinc-700 rounded"
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          {filtered.map((item) => (
             <div
               key={item._id}
-              className="bg-gray-700 flex justify-between items-center p-4 rounded-md shadow-md animate-slide-up"
+              className="bg-zinc-800 p-4 rounded-lg flex justify-between items-center"
             >
               <div>
-                <h3 className="text-lg font-semibold text-cyan-300">
+                <h3 className="text-xl font-bold text-teal-300">
                   {item.label}
                 </h3>
-                <p className="text-sm text-gray-400">{item.date}</p>
+                <p className="text-sm text-zinc-400">{item.date}</p>
               </div>
-              <span className="text-lg font-bold text-green-400">
+              <div className="text-green-400 font-bold text-lg">
                 ${item.value}
-              </span>
+              </div>
               <div className="flex gap-3">
                 <FaEdit
-                  className="cursor-pointer text-yellow-400 hover:scale-110 transition-transform"
-                  onClick={() => handleShowEdit(item._id)}
+                  className="text-yellow-400 cursor-pointer hover:scale-110"
+                  onClick={() => handleEdit(item)}
                 />
                 <FaTrash
-                  className="cursor-pointer text-red-500 hover:scale-110 transition-transform"
+                  className="text-red-500 cursor-pointer hover:scale-110"
                   onClick={() => handleDelete(item._id)}
                 />
               </div>
