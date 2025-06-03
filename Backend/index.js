@@ -32,7 +32,7 @@ app.use(
     resave: false,
     saveUninitialized: true,
     cookie: {
-      secure: false, // 🔴 false for development (no https)
+      secure: false,
       httpOnly: true,
       sameSite: "lax",
       store,
