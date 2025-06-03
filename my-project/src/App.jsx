@@ -30,16 +30,19 @@ function App() {
 
   useEffect(() => {
     axios
-      .get("http://localhost:5000/isLoggedIn", { withCredentials: true })
+      .get("https://backend-project-mpxb.onrender.com/isLoggedIn", {
+        withCredentials: true,
+      })
       .then((res) => setIsLoggedIn(res.data.loggedIn))
       .catch((err) => console.error(err));
   }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
+
     try {
       const res = await axios.post(
-        "http://your-backend.onrender.com/login",
+        "https://backend-project-mpxb.onrender.com/login",
         {
           username: form.username,
           password: form.password,
@@ -58,7 +61,7 @@ function App() {
     e.preventDefault();
     try {
       const res = await axios.post(
-        "http://localhost:5000/signup",
+        "https://backend-project-mpxb.onrender.com/signup",
         {
           username: form.username,
           password: form.password,
@@ -76,7 +79,7 @@ function App() {
   const handleLogout = async () => {
     try {
       await axios.post(
-        "http://localhost:5000/logout",
+        "https://backend-project-mpxb.onrender.com/logout",
         {},
         { withCredentials: true }
       );

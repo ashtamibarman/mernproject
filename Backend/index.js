@@ -4,76 +4,93 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
 const mongoDBStore = require("connect-mongodb-session")(session);
-const DB_CONNECTION =
-  "mongodb+srv://ashi:ashi@cluster0.7i1hf.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
-
 const dotenv = require("dotenv");
 const path = require("path");
-const app = express();
-
-const expenseRoute = require("./routes/expense");
-const authRouters = require("./routes/authRouter");
 
 dotenv.config();
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
+const app = express();
 
+// MongoDB connection string
+const DB_CONNECTION = process.env.DB_CONNECTION;
+
+// Session store
 const store = new mongoDBStore({
-  url: DB_CONNECTION,
+  uri: DB_CONNECTION,
   collection: "sessions",
 });
 
+// CORS setup BEFORE any routes
+app.use(
+  cors({
+    origin: "http://localhost:5173", // your frontend origin
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true, // allow cookies/session
+  })
+);
+
+// Middleware
+app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 app.use(
   session({
-    name: "connect.sid",
-    secret: "yourSecretKey",
+    secret: "your-secret-key",
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
+
     cookie: {
-      secure: false,
       httpOnly: true,
-      sameSite: "lax",
-      store,
+      secure: true, // because you're on HTTPS (Render)
+      sameSite: "none", // required for cross-origin cookies
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
     },
   })
 );
 
+// Set EJS engine (optional)
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+
+// Custom middleware to track login
 app.use((req, res, next) => {
   req.isLoggedIn = req.session.isLoggedIn;
   next();
 });
 
-app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`➡️  ${req.method} ${req.url}`);
+  console.log("📦 Body:", req.body);
+  next();
+});
 
-app.use(cookieParser());
+// Auth & expense routes
+const expenseRoute = require("./routes/expense");
+const authRouters = require("./routes/authRouter");
 
-app.use(
-  cors({
-    origin: ["http://localhost:5173", "https://my-project-5r8l.onrender.com"],
-    credentials: true,
-  })
-);
-
-app.use("/expenses", (req, res, next) => {
-  if (req.isLoggedIn) {
-    next();
-  } else {
-    node;
-    res.redirect("/login");
+app.get("/expenses", (req, res) => {
+  console.log("🔍 SESSION:", req.session);
+  if (!req.session?.isLoggedIn) {
+    console.log("❌ Unauthorized: No session");
+    return res.status(401).json({ message: "Unauthorized" });
   }
 });
 
 app.use("/expenses", expenseRoute);
 app.use(authRouters);
+
+// Serve static files
 app.use(express.static(path.join(__dirname, "public")));
 
+// MongoDB connection
 mongoose
-  .connect(process.env.DB_CONNECTION)
-  .then(() => console.log("mongodb connect"))
-  .catch((err) => console.error("mongoose error:", err));
-
-app.listen(process.env.PORT, () => {
-  console.log(`server is runnig on PORT ${process.env.PORT}`);
-});
+  .connect(DB_CONNECTION)
+  .then(() => {
+    console.log("MongoDB connected");
+    app.listen(process.env.PORT || 5000, () => {
+      console.log("Server running on port", process.env.PORT || 5000);
+    });
+  })
+  .catch((err) => {
+    console.error("MongoDB connection error:", err);
+  });
