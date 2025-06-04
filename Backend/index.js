@@ -3,33 +3,34 @@ const session = require("express-session");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const mongoDBStore = require("connect-mongodb-session")(session);
+const MongoDBStore = require("connect-mongodb-session")(session);
+const expenseRoutes = require("./routes/expenses");
 const dotenv = require("dotenv");
 
 dotenv.config();
 
 const app = express();
-
 const DB_CONNECTION = process.env.DB_CONNECTION;
+const PORT = process.env.PORT || 5000;
 
-const store = new mongoDBStore({
-  uri: DB_CONNECTION,
-  collection: "sessions",
-});
-
+// Use cors BEFORE session, with credentials true
 app.use(
   cors({
     origin: ["http://localhost:5173", "https://frontend-vzpf.onrender.com"],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+
     credentials: true,
   })
 );
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-app.set("trust proxy", 1); // Important when using HTTPS behind proxy (like Render.com)
+const store = new MongoDBStore({
+  uri: DB_CONNECTION,
+  collection: "sessions",
+});
+
+app.set("trust proxy", 1);
 
 app.use(
   session({
@@ -39,50 +40,48 @@ app.use(
     store: store,
     cookie: {
       httpOnly: true,
-      secure: true, // true for HTTPS
-      sameSite: "none", // important for cross-origin cookies
+      secure: false, // local test, change to true on HTTPS
+      sameSite: "lax", // "none" requires secure:true and HTTPS
       maxAge: 1000 * 60 * 60 * 24,
     },
   })
 );
 
-// Define the auth middleware here
+// Auth middleware
 const isAuth = (req, res, next) => {
   if (req.session?.isLoggedIn) {
     return next();
-  } else {
-    return res.status(401).json({ message: "Unauthorized" });
   }
+  return res.status(401).json({ message: "Unauthorized" });
 };
 
-// Dummy routes for demonstration
-// Replace with your real route files
-app.get("/expenses", isAuth, (req, res) => {
-  res.json({ expenses: [{ label: "Coffee", value: 3, date: "2025-06-01" }] });
-});
-
+// Login route BEFORE protected routes
 app.post("/login", (req, res) => {
-  // You should verify username and password here
-  // For demo, let's just accept anything and mark session loggedIn
   req.session.isLoggedIn = true;
-  req.session.save(() => {
+  req.session.userId = "demoUserId";
+  req.session.save((err) => {
+    if (err) {
+      return res.status(500).json({ message: "Login failed" });
+    }
     res.json({ message: "Logged in successfully" });
   });
 });
 
+// Logout
 app.post("/logout", (req, res) => {
   req.session.destroy(() => {
     res.json({ message: "Logged out" });
   });
 });
 
+// Protected routes after login
+app.use("/", expenseRoutes);
+
 mongoose
   .connect(DB_CONNECTION)
   .then(() => {
     console.log("MongoDB connected");
-    app.listen(process.env.PORT || 5000, () => {
-      console.log("Server running on port", process.env.PORT || 5000);
-    });
+    app.listen(PORT, () => console.log("Server running on port", PORT));
   })
   .catch((err) => {
     console.error("MongoDB connection error:", err);
