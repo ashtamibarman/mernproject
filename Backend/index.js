@@ -40,8 +40,8 @@ app.use(
     store: store,
     cookie: {
       httpOnly: true,
-      secure: false, // local test, change to true on HTTPS
-      sameSite: "lax", // "none" requires secure:true and HTTPS
+      secure: true, // local test, change to true on HTTPS
+      sameSite: "none", // "none" requires secure:true and HTTPS
       maxAge: 1000 * 60 * 60 * 24,
     },
   })
