@@ -25,7 +25,6 @@ exports.postSignup = async (req, res) => {
     req.session.isLoggedIn = true;
     req.session.userId = saved._id;
 
-    // Save session explicitly to ensure persistence before responding
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after signup:", err);
@@ -65,11 +64,9 @@ exports.postLogin = async (req, res, next) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    // Set session data
     req.session.isLoggedIn = true;
     req.session.userId = user._id;
 
-    // Save session explicitly to ensure persistence before responding
     req.session.save((err) => {
       if (err) {
         console.error("Session save error after login:", err);

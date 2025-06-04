@@ -7,7 +7,7 @@ const ExpenseSchema = new mongoose.Schema(
     date: { type: String, required: true },
   },
   {
-    timestamps: true, // <-- This adds createdAt and updatedAt fields
+    timestamps: true,
   }
 );
 

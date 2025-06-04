@@ -4,7 +4,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import { BrowserRouter } from "react-router-dom";
-import "./index.css"; // ✅ This line is important for your CSS
+import "./index.css";
 import axios from "axios";
 
 axios.defaults.withCredentials = true;

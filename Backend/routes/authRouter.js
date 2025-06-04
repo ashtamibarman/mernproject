@@ -8,6 +8,6 @@ authRouters.post("/login", authController.postLogin);
 authRouters.get("/isLoggedIn", authController.checkLoginStatus);
 authRouters.post("/logout", authController.postLogout);
 authRouters.get("/signup", authController.getSignup);
-authRouters.post("/signup", authController.postSignup); // ✅ add this
+authRouters.post("/signup", authController.postSignup);
 
 module.exports = authRouters;

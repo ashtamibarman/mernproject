@@ -2,9 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Expense = require("../models/Expense");
 
-// 🔐 OPTIONAL: replace with real auth middleware if needed
 const isAuth = (req, res, next) => {
-  // Skip auth for now — assume always logged in
   next();
 };
 

@@ -13,14 +13,10 @@ const app = express();
 const DB_CONNECTION = process.env.DB_CONNECTION;
 const PORT = process.env.PORT || 5000;
 
-// Use cors BEFORE session, with credentials true
 app.use(
   cors({
-    origin: [
-      "http://localhost:5173", // for local dev
-      "https://my-project-5r8l.onrender.com", // ✅ your deployed frontend
-    ],
-    credentials: true, // ✅ allows cookies to be sent
+    origin: ["http://localhost:5173", "https://my-project-5r8l.onrender.com"],
+    credentials: true,
   })
 );
 
@@ -42,8 +38,8 @@ app.use(
     store: store,
     cookie: {
       httpOnly: true,
-      secure: true, // ✅ true because Render uses HTTPS
-      sameSite: "none", // ✅ required for cross-origin cookies
+      secure: true,
+      sameSite: "none",
       maxAge: 1000 * 60 * 60 * 24, // 1 day
     },
   })
@@ -57,7 +53,6 @@ const isAuth = (req, res, next) => {
   return res.status(401).json({ message: "Unauthorized" });
 };
 
-// Login route BEFORE protected routes
 app.post("/login", (req, res) => {
   req.session.isLoggedIn = true;
   req.session.userId = "demoUserId";
