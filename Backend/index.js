@@ -16,9 +16,11 @@ const PORT = process.env.PORT || 5000;
 // Use cors BEFORE session, with credentials true
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://frontend-vzpf.onrender.com"],
-
-    credentials: true,
+    origin: [
+      "http://localhost:5173", // for local dev
+      "https://my-project-5r8l.onrender.com", // ✅ your deployed frontend
+    ],
+    credentials: true, // ✅ allows cookies to be sent
   })
 );
 
@@ -40,9 +42,9 @@ app.use(
     store: store,
     cookie: {
       httpOnly: true,
-      secure: true, // local test, change to true on HTTPS
-      sameSite: "none", // "none" requires secure:true and HTTPS
-      maxAge: 1000 * 60 * 60 * 24,
+      secure: true, // ✅ true because Render uses HTTPS
+      sameSite: "none", // ✅ required for cross-origin cookies
+      maxAge: 1000 * 60 * 60 * 24, // 1 day
     },
   })
 );
